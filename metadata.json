@@ -1,0 +1,7 @@
+{
+  "name": "El Nazir",
+  "description": "A gamified task management platform that uses Gemini AI to enforce accountability through witty forfeits for missed deadlines.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
