@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task, Forfeit } from "../types";
 
-const apiKey = process.env.API_KEY || '';
+// Safe access to process.env to prevent runtime crashes in browsers
+const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey });

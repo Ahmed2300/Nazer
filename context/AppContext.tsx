@@ -273,40 +273,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- TASK MANAGEMENT ---
   
-  const addTask = async (task: Task) => {
-    // GUARD: Only Admin can add tasks
-    if (currentUser?.role !== 'ADMIN') {
-        alert('يا ناصح! الناظر بس هو اللي بيحط الواجبات.');
-        return;
-    }
-
-    setTasks(prev => [task, ...prev]);
-    if (appConfig?.channelId) {
-       await fbApi.saveTask(appConfig.channelId, task);
-       if (appConfig.botToken) {
-          const assignee = team.members.find(m => m.id === task.assigneeId);
-          notifyNewTask(appConfig.botToken, appConfig.channelId, task, assignee);
-          if (assignee && assignee.telegramChatId) {
-            notifyNewTask(appConfig.botToken, assignee.telegramChatId, task, assignee, true);
-          }
-       }
-    }
-  };
-
-  const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
-    if (!appConfig?.channelId) return;
-    const targetTask = tasks.find(t => t.id === taskId);
-    if (!targetTask) return;
-    const updatedTask = { ...targetTask, status };
-    setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-    await fbApi.saveTask(appConfig.channelId, updatedTask);
-
-    if (status === TaskStatus.COMPLETED || status === TaskStatus.RESOLVED) {
-       const points = POINTS_SYSTEM.COMPLETION[updatedTask.severity] || 10;
-       updateUserScore(updatedTask.assigneeId, points, `إنجاز مهمة: ${updatedTask.title}`);
-    }
-  };
-
   const updateUserScore = async (userId: string, points: number, reason: string) => {
     if (!appConfig?.channelId) return;
     
@@ -327,6 +293,57 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
        if (appConfig.botToken) {
          notifyScoreChange(appConfig.botToken, appConfig.channelId, member, points, reason);
        }
+    }
+  };
+
+  const addTask = async (task: Task) => {
+    // GUARD: Only Admin can add tasks
+    if (currentUser?.role !== 'ADMIN') {
+        alert('يا ناصح! الناظر بس هو اللي بيحط الواجبات.');
+        return;
+    }
+
+    // --- LOGIC FIX: Check for Past Deadline Immediately ---
+    const now = new Date();
+    const deadline = new Date(task.deadline);
+    const isLate = deadline < now;
+
+    const finalTask = {
+        ...task,
+        status: isLate ? TaskStatus.OVERDUE : TaskStatus.PENDING
+    };
+
+    setTasks(prev => [finalTask, ...prev]);
+    
+    if (appConfig?.channelId) {
+       await fbApi.saveTask(appConfig.channelId, finalTask);
+       if (appConfig.botToken) {
+          const assignee = team.members.find(m => m.id === task.assigneeId);
+          notifyNewTask(appConfig.botToken, appConfig.channelId, finalTask, assignee);
+          if (assignee && assignee.telegramChatId) {
+            notifyNewTask(appConfig.botToken, assignee.telegramChatId, finalTask, assignee, true);
+          }
+
+          // Apply Penalty Immediately if created with past date
+          if (isLate) {
+             const penalty = POINTS_SYSTEM.PENALTY[finalTask.severity];
+             updateUserScore(finalTask.assigneeId, penalty, `بداية متعثرة (ديدلاين قديم): ${finalTask.title}`);
+          }
+       }
+    }
+  };
+
+  const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
+    if (!appConfig?.channelId) return;
+    const targetTask = tasks.find(t => t.id === taskId);
+    if (!targetTask) return;
+    const updatedTask = { ...targetTask, status };
+    setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+    await fbApi.saveTask(appConfig.channelId, updatedTask);
+
+    if (status === TaskStatus.COMPLETED || status === TaskStatus.RESOLVED) {
+       const points = POINTS_SYSTEM.COMPLETION[updatedTask.severity] || 10;
+       updateUserScore(updatedTask.assigneeId, points, `إنجاز مهمة: ${updatedTask.title}`);
     }
   };
 
@@ -438,6 +455,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const isActiveStatus = task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS;
         
         if (isOverdue && isActiveStatus && appConfig?.channelId) {
+            // Logic for tasks that become overdue AFTER creation
             const updatedTask = { ...task, status: TaskStatus.OVERDUE };
             updateTaskStatus(task.id, TaskStatus.OVERDUE);
             const penaltyPoints = POINTS_SYSTEM.PENALTY[task.severity];
