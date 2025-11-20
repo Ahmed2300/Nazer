@@ -9,7 +9,7 @@ const sanitizeId = (id: string) => id ? id.toString().trim().replace(/[.#$[\]]/g
 export const fbApi = {
   // --- USERS (Global) ---
   getUser: async (chatId: string): Promise<any | null> => {
-    const res = await fetch(`${DB_URL}/users/${sanitizeId(chatId)}.json`);
+    const res = await fetch(`${DB_URL}/users/${sanitizeId(chatId)}.json`, { cache: 'no-store' });
     if (!res.ok) return null;
     return res.json();
   },
@@ -45,12 +45,12 @@ export const fbApi = {
     const summaries: TeamSummary[] = [];
     
     for (const id of teamIds) {
-       const res = await fetch(`${DB_URL}/teams/${id}/info.json`);
+       const res = await fetch(`${DB_URL}/teams/${id}/info.json`, { cache: 'no-store' });
        if (res.ok) {
          const info = await res.json();
          if (info) {
             // Get member count roughly
-            const memRes = await fetch(`${DB_URL}/teams/${id}/members.json?shallow=true`);
+            const memRes = await fetch(`${DB_URL}/teams/${id}/members.json?shallow=true`, { cache: 'no-store' });
             const memCount = memRes.ok ? Object.keys(await memRes.json() || {}).length : 0;
 
             summaries.push({
@@ -69,7 +69,7 @@ export const fbApi = {
   // --- TEAMS ---
   getTeamData: async (channelId: string) => {
     const cleanId = sanitizeId(channelId);
-    const res = await fetch(`${DB_URL}/teams/${cleanId}.json`);
+    const res = await fetch(`${DB_URL}/teams/${cleanId}.json`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     
