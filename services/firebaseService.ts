@@ -1,3 +1,4 @@
+
 import { Task, Team, User, AppConfig, TeamSummary } from '../types';
 
 const DB_URL = "https://posts-a6aaf-default-rtdb.firebaseio.com";
@@ -18,6 +19,14 @@ export const fbApi = {
     await fetch(`${DB_URL}/users/${sanitizeId(user.telegramChatId)}.json`, {
       method: 'PATCH', // PATCH to update fields but keep joinedTeams if exists
       body: JSON.stringify(user)
+    });
+  },
+
+  updateGlobalProfile: async (userId: string, updates: { name?: string, avatar?: string }) => {
+    const cleanId = sanitizeId(userId);
+    await fetch(`${DB_URL}/users/${cleanId}.json`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
     });
   },
 
@@ -105,6 +114,15 @@ export const fbApi = {
     await fetch(`${DB_URL}/teams/${cleanId}/members/${sanitizeId(user.telegramChatId)}.json`, {
       method: 'PUT',
       body: JSON.stringify(user)
+    });
+  },
+
+  updateMemberProfile: async (channelId: string, userId: string, updates: { name?: string, avatar?: string }) => {
+    const cleanId = sanitizeId(channelId);
+    const cleanUserId = sanitizeId(userId);
+    await fetch(`${DB_URL}/teams/${cleanId}/members/${cleanUserId}.json`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
     });
   },
 

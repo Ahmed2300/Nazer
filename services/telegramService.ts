@@ -3,6 +3,7 @@ import { Task, User, Forfeit } from '../types';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_FILE_BASE = 'https://api.telegram.org/file/bot';
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 // Helper to escape HTML characters to prevent Telegram API errors
 const escapeHtml = (text: string) => {
@@ -17,10 +18,7 @@ const escapeHtml = (text: string) => {
 
 const sendMessage = async (token: string, chatId: string, text: string) => {
   try {
-    if (!token || !chatId) {
-        // console.warn('Missing Token or Chat ID'); 
-        return;
-    }
+    if (!token || !chatId) return;
 
     const params = new URLSearchParams();
     params.append('chat_id', chatId);
@@ -35,16 +33,19 @@ const sendMessage = async (token: string, chatId: string, text: string) => {
     });
     
   } catch (error) {
-    console.error('Telegram Notification Failed (Check Bot Token/Network):', error);
+    console.error('Telegram Notification Failed:', error);
   }
 };
 
 export const getTelegramUpdates = async (token: string, offset: number) => {
   try {
     if (!token) return [];
-    const response = await fetch(`${TELEGRAM_API_BASE}${token}/getUpdates?offset=${offset}&timeout=1`, {
+    // Use Proxy to bypass CORS in browser environment
+    const url = `${TELEGRAM_API_BASE}${token}/getUpdates?offset=${offset}&timeout=1`;
+    const response = await fetch(`${PROXY_URL}${encodeURIComponent(url)}&disableCache=true`, {
       method: 'GET',
     });
+    
     if (!response.ok) return [];
     const data = await response.json();
     if (data.ok) return data.result;
@@ -58,23 +59,44 @@ export const getTelegramPhotoUrl = async (token: string, userId: string): Promis
   try {
     if (!token || !userId) return null;
 
-    // 1. Get User Profile Photos
-    const photosResponse = await fetch(`${TELEGRAM_API_BASE}${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
-    
-    if (!photosResponse.ok) return null;
-    const photosData = await photosResponse.json();
+    let fileId: string | null = null;
 
-    if (!photosData.ok || photosData.result.total_count === 0) {
-      return null;
+    // 1. Try Get User Profile Photos first (Standard)
+    const photosApiUrl = `${TELEGRAM_API_BASE}${token}/getUserProfilePhotos?user_id=${userId}&limit=1`;
+    try {
+      const photosResponse = await fetch(`${PROXY_URL}${encodeURIComponent(photosApiUrl)}&disableCache=true`);
+      if (photosResponse.ok) {
+        const photosData = await photosResponse.json();
+        if (photosData.ok && photosData.result.total_count > 0) {
+          const photoArray = photosData.result.photos[0];
+          fileId = photoArray[photoArray.length - 1].file_id;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch userProfilePhotos', e);
     }
 
-    // Get the largest photo variant
-    const photoArray = photosData.result.photos[0];
-    const bestPhoto = photoArray[photoArray.length - 1];
-    const fileId = bestPhoto.file_id;
+    // 2. Fallback: Try getChat (Works if bot shares a group or has interacted)
+    if (!fileId) {
+       try {
+         const chatApiUrl = `${TELEGRAM_API_BASE}${token}/getChat?chat_id=${userId}`;
+         const chatResponse = await fetch(`${PROXY_URL}${encodeURIComponent(chatApiUrl)}&disableCache=true`);
+         if (chatResponse.ok) {
+            const chatData = await chatResponse.json();
+            if (chatData.ok && chatData.result.photo) {
+               fileId = chatData.result.photo.big_file_id;
+            }
+         }
+       } catch (e) {
+          console.warn('Failed to fetch getChat info', e);
+       }
+    }
 
-    // 2. Get File Path
-    const fileResponse = await fetch(`${TELEGRAM_API_BASE}${token}/getFile?file_id=${fileId}`);
+    if (!fileId) return null;
+
+    // 3. Get File Path (Using Proxy)
+    const fileApiUrl = `${TELEGRAM_API_BASE}${token}/getFile?file_id=${fileId}`;
+    const fileResponse = await fetch(`${PROXY_URL}${encodeURIComponent(fileApiUrl)}&disableCache=true`);
     if (!fileResponse.ok) return null;
     const fileData = await fileResponse.json();
 
@@ -82,7 +104,7 @@ export const getTelegramPhotoUrl = async (token: string, userId: string): Promis
 
     const filePath = fileData.result.file_path;
 
-    // 3. Return Direct URL
+    // 4. Return Direct URL (Valid for 1 hour)
     return `${TELEGRAM_FILE_BASE}${token}/${filePath}`;
     
   } catch (error) {

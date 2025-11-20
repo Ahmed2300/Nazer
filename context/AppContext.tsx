@@ -1,7 +1,9 @@
+
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { Task, TaskStatus, TaskSeverity, User, Team, AppView, AppConfig, POINTS_SYSTEM, Forfeit, TeamSummary } from '../types';
 import { notifyNewTask, notifyJudgement, notifyResolution, notifyJudgementCandidates, notifyScoreChange, getTelegramPhotoUrl, getTelegramUpdates, notifyInvalidSelection } from '../services/telegramService';
 import { fbApi } from '../services/firebaseService';
+import { uploadToImgBB } from '../services/imageService';
 
 interface AppContextType {
   appView: AppView;
@@ -30,6 +32,7 @@ interface AppContextType {
   submitProof: (taskId: string, proofUrl: string) => void;
   deleteTask: (taskId: string) => void;
   addMember: (name: string, handle: string, chatId: string) => Promise<void>;
+  updateUserProfile: (name: string, avatarFile?: File) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -187,6 +190,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAppView('TEAM_SELECTION');
   };
 
+  const updateUserProfile = async (name: string, avatarFile?: File) => {
+    if (!currentUser || !currentUser.id) return;
+
+    let finalAvatar = currentUser.avatar;
+    
+    // 1. Upload Image if provided
+    if (avatarFile) {
+        const hostedUrl = await uploadToImgBB(avatarFile);
+        if (hostedUrl) finalAvatar = hostedUrl;
+    }
+
+    // 2. Update Local State Immediately
+    const updatedUser = { ...currentUser, name, avatar: finalAvatar };
+    setCurrentUser(updatedUser);
+
+    // Update Current Team Members list locally
+    setTeam(prev => ({
+        ...prev,
+        members: prev.members.map(m => m.id === currentUser.id ? { ...m, name, avatar: finalAvatar } : m)
+    }));
+
+    // 3. Update Global DB
+    await fbApi.updateGlobalProfile(currentUser.id, { name, avatar: finalAvatar });
+
+    // 4. Update All Teams (So other teams see new profile)
+    if (currentUser.joinedTeams) {
+        const teamIds = Object.keys(currentUser.joinedTeams);
+        for (const teamId of teamIds) {
+            await fbApi.updateMemberProfile(teamId, currentUser.id, { name, avatar: finalAvatar });
+        }
+    }
+  };
+
   const createTeam = async (token: string, channelId: string, name: string, image: string) => {
     if (!currentUser || !currentUser.telegramChatId) return;
 
@@ -194,6 +230,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     // 1. Check if User has Real Avatar via this new token
     let finalUser = { ...currentUser, role: 'ADMIN' as const }; // Creator is Admin
+    // Note: We just use the direct URL here as the token is part of this new team config
     const photoUrl = await getTelegramPhotoUrl(token, currentUser.telegramChatId);
     if (photoUrl) finalUser.avatar = photoUrl;
 
@@ -306,7 +343,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
     }
 
-    // --- LOGIC FIX: Check for Past Deadline Immediately ---
+    // Check for Past Deadline Immediately
     const now = new Date();
     const deadline = new Date(task.deadline);
     const isLate = deadline.getTime() < now.getTime();
@@ -329,7 +366,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     // Apply Penalty Immediately if created with past date
-    // IMPORTANT: This check must be outside the botToken condition
     if (isLate) {
        const penalty = POINTS_SYSTEM.PENALTY[finalTask.severity];
        if (finalTask.assigneeId) {
@@ -443,7 +479,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 reason = `رفع ظلم (مسح مهمة): ${taskToDelete.title}`;
             }
             // Case B: Resolved Task (Penalty + Redemption) -> Revert Both
-            // Net Change was (Penalty + Redemption). We reverse it: +Abs(Penalty) - Redemption.
             else if (taskToDelete.status === TaskStatus.RESOLVED) {
                 const penalty = POINTS_SYSTEM.PENALTY[taskToDelete.severity] || -15;
                 const redemption = POINTS_SYSTEM.REDEMPTION || 15;
@@ -464,16 +499,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     } catch (err) {
         console.error("Failed to delete task cleanly from DB/Score:", err);
-        // NOTE: We do NOT revert the local state here to prevent UI flickering.
-        // In a production app, we might show a toast error.
     }
   };
 
   const addMember = async (name: string, handle: string, chatId: string) => {
     let avatar = `https://ui-avatars.com/api/?name=${name}&background=random&color=fff`;
+    
     if (appConfig?.botToken && chatId) {
-      const realAvatar = await getTelegramPhotoUrl(appConfig.botToken, chatId);
-      if (realAvatar) avatar = realAvatar;
+      try {
+        // 1. Fetch Telegram URL (Attempt multiple methods via service)
+        const telegramUrl = await getTelegramPhotoUrl(appConfig.botToken, chatId);
+        
+        if (telegramUrl) {
+            // 2. Attempt to upload to ImgBB for permanent storage
+            try {
+                // Fetch the blob through proxy
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(telegramUrl)}&disableCache=true`;
+                const res = await fetch(proxyUrl);
+                
+                if (res.ok) {
+                  const blob = await res.blob();
+                  const file = new File([blob], `avatar_${chatId}.jpg`, { type: "image/jpeg" });
+                  
+                  const hostedUrl = await uploadToImgBB(file);
+                  if (hostedUrl) {
+                      avatar = hostedUrl;
+                  } else {
+                      console.warn("ImgBB Upload returned null, using direct link");
+                      avatar = telegramUrl; 
+                  }
+                } else {
+                   console.warn("Proxy fetch failed for avatar, using direct link");
+                   avatar = telegramUrl; 
+                }
+            } catch (e) {
+                console.warn("Failed to upload Telegram image to host, using direct link", e);
+                avatar = telegramUrl;
+            }
+        } else {
+            console.log("No Telegram avatar found for", chatId);
+        }
+      } catch (e) {
+        console.error("Error fetching telegram avatar", e);
+      }
     }
 
     const newMember: User = {
@@ -512,9 +580,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
     };
     if (appView === 'MAIN_APP') {
-       // Run check immediately to catch any tasks that are already overdue (e.g. added in past)
        checkOverdueTasks();
-
        const intervalId = setInterval(checkOverdueTasks, 30000); 
        return () => clearInterval(intervalId);
     }
@@ -560,7 +626,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       appView, currentUser, userTeams, appConfig, team, tasks,
       completeOnboarding, registerUser, createTeam, joinTeamById, selectTeam, exitTeam, signOut,
-      addTask, updateTaskStatus, assignForfeits, selectForfeit, submitProof, deleteTask, addMember
+      addTask, updateTaskStatus, assignForfeits, selectForfeit, submitProof, deleteTask, addMember, updateUserProfile
     }}>
       {children}
     </AppContext.Provider>
