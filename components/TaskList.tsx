@@ -224,7 +224,8 @@ export const TaskList: React.FC = () => {
                             {/* DELETE BUTTON: ADMIN ONLY */}
                             {isAdmin && (
                                 <button 
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.stopPropagation(); // Prevent bubble up issues
                                         if(confirm('متأكد إنك عايز تمسحها؟ الناظر مبينساش.')) {
                                             deleteTask(task.id);
                                             closeMenu();

@@ -151,13 +151,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let userToLogin: User;
 
     // LOGIC FIX: If user exists, prioritize DATABASE data over FORM data.
-    // This prevents overwriting a user's established name/profile with a new login attempt.
     if (existingUser) {
       userToLogin = { 
         ...existingUser, 
         id: chatId, 
         telegramChatId: chatId,
-        // Use existing name/handle if available, otherwise fallback to form input
         name: existingUser.name || name, 
         telegramHandle: existingUser.telegramHandle || handle,
         avatar: existingUser.avatar || `https://ui-avatars.com/api/?name=${name}&background=d69e2e&color=1a1a1a`,
@@ -179,7 +177,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
     }
 
-    // Save/Update to Global Users (Only updates fields, won't overwrite if we use the object constructed above)
+    // Save/Update to Global Users
     await fbApi.registerUser(userToLogin);
     
     setCurrentUser(userToLogin);
@@ -303,32 +301,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
     }
 
+    if (!appConfig?.channelId) {
+        console.error("Cannot add task: Missing Channel ID");
+        return;
+    }
+
     // --- LOGIC FIX: Check for Past Deadline Immediately ---
     const now = new Date();
     const deadline = new Date(task.deadline);
-    const isLate = deadline < now;
+    const isLate = deadline.getTime() < now.getTime();
 
-    const finalTask = {
+    const finalTask: Task = {
         ...task,
         status: isLate ? TaskStatus.OVERDUE : TaskStatus.PENDING
     };
 
     setTasks(prev => [finalTask, ...prev]);
     
-    if (appConfig?.channelId) {
-       await fbApi.saveTask(appConfig.channelId, finalTask);
-       if (appConfig.botToken) {
-          const assignee = team.members.find(m => m.id === task.assigneeId);
-          notifyNewTask(appConfig.botToken, appConfig.channelId, finalTask, assignee);
-          if (assignee && assignee.telegramChatId) {
-            notifyNewTask(appConfig.botToken, assignee.telegramChatId, finalTask, assignee, true);
-          }
+    await fbApi.saveTask(appConfig.channelId, finalTask);
 
-          // Apply Penalty Immediately if created with past date
-          if (isLate) {
-             const penalty = POINTS_SYSTEM.PENALTY[finalTask.severity];
-             updateUserScore(finalTask.assigneeId, penalty, `بداية متعثرة (ديدلاين قديم): ${finalTask.title}`);
-          }
+    if (appConfig.botToken) {
+        const assignee = team.members.find(m => m.id === task.assigneeId);
+        notifyNewTask(appConfig.botToken, appConfig.channelId, finalTask, assignee);
+        if (assignee && assignee.telegramChatId) {
+          notifyNewTask(appConfig.botToken, assignee.telegramChatId, finalTask, assignee, true);
+        }
+    }
+
+    // Apply Penalty Immediately if created with past date
+    // IMPORTANT: This check must be outside the botToken condition
+    if (isLate) {
+       const penalty = POINTS_SYSTEM.PENALTY[finalTask.severity];
+       if (finalTask.assigneeId) {
+           updateUserScore(finalTask.assigneeId, penalty, `بداية متعثرة (ديدلاين قديم): ${finalTask.title}`);
        }
     }
   };
@@ -412,8 +417,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
     }
     if (!appConfig?.channelId) return;
+
+    const taskToDelete = tasks.find(t => t.id === taskId);
+
+    // 1. OPTIMISTIC UPDATE: Remove from Local State immediately
     setTasks(prev => prev.filter(t => t.id !== taskId));
-    await fbApi.deleteTask(appConfig.channelId, taskId);
+    
+    // 2. Handle Side Effects (DB & Scoring) asynchronously
+    try {
+        // A. Delete from Firebase
+        await fbApi.deleteTask(appConfig.channelId, taskId);
+
+        // B. Revert Points (Fully Cleaned)
+        if (taskToDelete) {
+            let pointsToRevert = 0;
+            let reason = '';
+
+            // Case A: Bad Task (Overdue/Judgement/Forfeit) -> User lost points -> Give them back
+            if (taskToDelete.status === TaskStatus.OVERDUE || 
+                taskToDelete.status === TaskStatus.JUDGEMENT_PENDING || 
+                taskToDelete.status === TaskStatus.FORFEIT_ASSIGNED) {
+                
+                const penalty = POINTS_SYSTEM.PENALTY[taskToDelete.severity] || -15;
+                pointsToRevert = Math.abs(penalty);
+                reason = `رفع ظلم (مسح مهمة): ${taskToDelete.title}`;
+            }
+            // Case B: Resolved Task (Penalty + Redemption) -> Revert Both
+            // Net Change was (Penalty + Redemption). We reverse it: +Abs(Penalty) - Redemption.
+            else if (taskToDelete.status === TaskStatus.RESOLVED) {
+                const penalty = POINTS_SYSTEM.PENALTY[taskToDelete.severity] || -15;
+                const redemption = POINTS_SYSTEM.REDEMPTION || 15;
+                pointsToRevert = Math.abs(penalty) - redemption;
+                reason = `إلغاء مهمة (تسوية شاملة): ${taskToDelete.title}`;
+            }
+            // Case C: Completed Task (Positive Reward) -> Revert Reward
+            else if (taskToDelete.status === TaskStatus.COMPLETED) {
+                const reward = POINTS_SYSTEM.COMPLETION[taskToDelete.severity] || 10;
+                pointsToRevert = -reward;
+                reason = `إلغاء مهمة (سحب نقاط): ${taskToDelete.title}`;
+            }
+
+            // Only update if there is a score change
+            if (pointsToRevert !== 0) {
+                await updateUserScore(taskToDelete.assigneeId, pointsToRevert, reason);
+            }
+        }
+    } catch (err) {
+        console.error("Failed to delete task cleanly from DB/Score:", err);
+        // NOTE: We do NOT revert the local state here to prevent UI flickering.
+        // In a production app, we might show a toast error.
+    }
   };
 
   const addMember = async (name: string, handle: string, chatId: string) => {
@@ -435,12 +488,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     setTeam(prev => ({ ...prev, members: [...prev.members, newMember] }));
     if (appConfig?.channelId) {
-       // Add to team-specific members list
        await fbApi.saveMember(appConfig.channelId, newMember);
-       
-       // IMPORTANT: Also link in the global User store so they see this team when they log in
-       // Note: We don't create the full Global User here (they do that on first login), 
-       // but we create the relationship node so `getUserTeams` finds it later.
        await fbApi.linkUserToTeam(chatId, appConfig.channelId);
     }
   };
