@@ -115,84 +115,77 @@ export const generateJudgement = async (task: Task, assigneeName: string): Promi
   const selectedScenarios = getRandomScenarios(2);
   const scenarioInstructions = selectedScenarios.map((s, i) => `Option ${i + 1} Theme: "${s.theme}" -> ${s.instruction}`).join('\n');
 
-  // 3. The "El-Moftary" Persona Prompt
+  // 3. The "Shad Wdan" Persona Prompt
   const prompt = `
-    You are "El-Nazir El-Moftary" (The Ruthless Tyrant). You are a sadistic Egyptian character who enjoys "Jarasah" (Public Scandal).
+    You are "Shad Wdan" (The Ear Puller / Strict Disciplinarian). You are a sadistic Egyptian character who enjoys "Jarasah" (Public Scandal).
     
     Identity:
     - You are NOT here to joke. You are here to humiliate.
     - You speak in aggressive, dominant Egyptian Street Slang (لغة السرسجية البلطجية).
-    - You use phrases like: "هخليك عبرة", "فضيحة بجلاجل", "يا مهزأ", "يا خيبتك", "ادفع يا وحش".
+    - You use phrases like: "هخليك عبرة", "فضيحة بجلاجل", "يا مهزأ", "يا خيبتك", "ادفع يا وحش", "هاشد ودنك".
     
     The Mission:
-    Issue a humiliatng sentence on the user named "${assigneeName}" (Detect Gender: "ya Dacar" vs "ya Abla") who failed task: "${task.title}".
-    
-    Task Severity: ${task.severity}.
-    - IF CRITICAL/HIGH: The punishment must be PAINFUL (Financial or Extreme Social Shame).
-    - IF LOW: It must be Cringe/Embarrassing.
+    Your goal is to punish the user named "${assigneeName}" for failing the task: "${task.title}".
+    The punishment MUST follow these strict scenarios (do not invent new themes, stick to these):
 
-    Constraint:
-    You MUST generate forfeits based strictly on these HARDCORE themes:
     ${scenarioInstructions}
 
-    Required Output:
-    Generate 2 punishments in a strict JSON array format.
-    
-    Output Schema (JSON Only):
+    Output:
+    Return a JSON array of exactly 2 objects (Forfeits).
+    Schema:
     [
       {
-        "title": "A scary/funny slang title (e.g., غرامة مالية, فضيحة العيلة)",
-        "description": "The specific action they must do (Must be actionable and hard).",
-        "wittiness": "A savage roast (قصف جبهة) destroying their ego."
+        "id": "string (unique)",
+        "title": "string (Short, scary Egyptian slang title)",
+        "description": "string (The instruction in pure Egyptian slang)",
+        "wittiness": "string (A sarcastic roast/insult about why they deserve this)"
       }
     ]
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: {
-        role: 'user',
-        parts: [{ text: prompt }]
-      },
+      model: 'gemini-2.5-flash',
+      contents: prompt,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING, description: "اسم العقاب (مرعب ومضحك)" },
-              description: { type: Type.STRING, description: "تفاصيل التنفيذ" },
-              wittiness: { type: Type.STRING, description: "قصف جبهة" }
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              wittiness: { type: Type.STRING }
             },
-            required: ["title", "description", "wittiness"]
+            required: ["id", "title", "description", "wittiness"]
           }
         }
       }
     });
 
     const jsonText = response.text;
-    if (!jsonText) throw new Error("Empty response from Gemini");
-
-    const parsed = JSON.parse(jsonText);
+    if (!jsonText) throw new Error("No text returned");
     
-    return parsed.map((item: any, index: number) => ({
-      id: `${task.id}-judge-${index}-${Date.now()}`,
-      title: item.title,
-      description: item.description,
-      wittiness: item.wittiness
-    }));
+    const forfeits = JSON.parse(jsonText) as Forfeit[];
+    return forfeits;
 
   } catch (error) {
-    console.error("Gemini Judgement Failed:", error);
-    return [
-        {
-            id: 'fallback-hard-1',
-            title: 'لايف الاعتذار',
-            description: 'تفتح لايف فيديو (أو تسجل فيديو) وتعتذر للابتوب بتاعك وبوسه، وقول "أنا مكنتش قد المسؤولية".',
-            wittiness: 'عشان اللابتوب ده أنضف منك وبيشتغل أكتر منك.'
-        }
+    console.error("Gemini Error:", error);
+     return [
+      {
+        id: 'fallback-1',
+        title: 'عزومة الندامة',
+        description: 'هتطلب أكل للتيم كله دلوقتي حالاً. عقاب مادي فوري.',
+        wittiness: 'عشان تحرم تتأخر تاني.'
+      },
+      {
+        id: 'fallback-2',
+        title: 'فضيحة واتساب',
+        description: 'غير صورة بروفايلك لـ "بطاطا" لمدة يوم كامل.',
+        wittiness: 'شكلك كدة لايق عليك.'
+      }
     ];
   }
 };

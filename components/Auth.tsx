@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
-import { User, AtSign, Hash, Info, LogIn } from 'lucide-react';
+import { User, AtSign, Hash, Info, LogIn, HelpCircle } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 interface AuthProps {
   onRegister: (name: string, handle: string, chatId: string) => void;
 }
 
 export const Auth: React.FC<AuthProps> = ({ onRegister }) => {
+  const { openAbout } = useApp();
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [chatId, setChatId] = useState('');
@@ -22,12 +24,21 @@ export const Auth: React.FC<AuthProps> = ({ onRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative">
+       <button 
+         onClick={openAbout}
+         className="absolute top-6 right-6 bg-white hover:bg-slate-50 text-slate-500 hover:text-nazir-500 font-bold py-2 px-4 rounded-full shadow-sm border border-slate-200 flex items-center gap-2 transition-all text-sm"
+       >
+         <HelpCircle size={18} /> إيه هو شد ودان؟
+       </button>
+
       <div className="max-w-md w-full bg-white border border-slate-200 p-10 rounded-3xl shadow-xl">
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-nazir-dark rounded-2xl mx-auto flex items-center justify-center text-3xl font-black text-white shadow-lg mb-4 rotate-3">
-            ن
-          </div>
+          <img 
+            src="https://iili.io/f3oqJuS.png" 
+            alt="Shad Wdan Logo" 
+            className="w-24 h-24 mx-auto mb-4 drop-shadow-xl hover:scale-105 transition-transform duration-300" 
+          />
           <h2 className="text-3xl font-bold text-slate-800 mb-2">تسجيل الدخول</h2>
           <p className="text-slate-500">لو ليك حساب هيدخلك علطول، لو جديد هنسجلك.</p>
         </div>

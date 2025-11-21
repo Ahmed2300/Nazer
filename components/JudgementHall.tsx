@@ -26,7 +26,7 @@ export const JudgementHall: React.FC = () => {
       // This will now Auto-Publish to Telegram (silent flag removed from context)
       assignForfeits(task.id, forfeits);
     } catch (e) {
-      alert('الناظر بيشرب قهوة وسيجارة، جرب كمان شوية.');
+      alert('السيستم بيحمل، جرب كمان شوية.');
     } finally {
       setLoadingId(null);
     }
@@ -55,9 +55,9 @@ export const JudgementHall: React.FC = () => {
           <Gavel size={250} />
         </div>
         <div className="relative z-10">
-            <h1 className="text-4xl font-black text-nazir-dark mb-3">المجلس التأديبي <span className="text-red-600">(سلخانة الناظر)</span></h1>
+            <h1 className="text-4xl font-black text-nazir-dark mb-3">المجلس التأديبي <span className="text-red-600">(سلخانة شد ودان)</span></h1>
             <p className="text-slate-500 max-w-2xl text-lg leading-relaxed font-medium">
-            دخلت برجلك يا بطل. هنا مفيش رحمة. الناظر مش بس هيعاقبك، الناظر هيفضحك ويخليك "تريند" في المكتب. 
+            دخلت برجلك يا بطل. هنا مفيش رحمة. "شد ودان" مش بس هيعاقبك، السيستم هيفضحك ويخليك "تريند" في المكتب. 
             استعد لدفع ثمن تأخيرك من كرامتك.
             </p>
         </div>
@@ -95,11 +95,11 @@ export const JudgementHall: React.FC = () => {
                 {loadingId === task.id ? (
                   <>
                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                     <span className="text-sm">الناظر بيسن سكاكينه...</span>
+                     <span className="text-sm">"شد ودان" بيجهز العقاب...</span>
                   </>
                 ) : (
                   <>
-                    <Gavel size={20} /> استدعاء الناظر
+                    <Gavel size={20} /> استدعاء شد ودان
                   </>
                 )}
               </button>

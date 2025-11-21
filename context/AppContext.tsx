@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { Task, TaskStatus, TaskSeverity, User, Team, AppView, AppConfig, POINTS_SYSTEM, Forfeit, TeamSummary } from '../types';
 import { notifyNewTask, notifyJudgement, notifyResolution, notifyJudgementCandidates, notifyScoreChange, getTelegramPhotoUrl, getTelegramUpdates, notifyInvalidSelection } from '../services/telegramService';
@@ -22,7 +21,9 @@ interface AppContextType {
   joinTeamById: (channelId: string) => Promise<boolean>;
   selectTeam: (channelId: string) => Promise<void>;
   exitTeam: () => void;
-  signOut: () => void; // Added
+  signOut: () => void;
+  openAbout: () => void; // Added
+  goBack: () => void; // Added for navigating back from About
   
   // App Actions
   addTask: (task: Task) => void;
@@ -48,6 +49,7 @@ const sanitizeId = (id: string) => id ? id.toString().trim().replace(/[.#$[\]]/g
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [appView, setAppView] = useState<AppView>('ONBOARDING');
+  const [previousView, setPreviousView] = useState<AppView | null>(null); // Track history for back button
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userTeams, setUserTeams] = useState<TeamSummary[]>([]);
   
@@ -145,6 +147,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setTeam(MOCK_TEAM);
     setTasks([]);
     setAppView('AUTH');
+  };
+
+  const openAbout = () => {
+    if (appView !== 'ABOUT') {
+      setPreviousView(appView);
+      setAppView('ABOUT');
+    }
+  };
+
+  const goBack = () => {
+    if (previousView) {
+      setAppView(previousView);
+      setPreviousView(null);
+    } else {
+      // Fallback default
+      setAppView(currentUser ? 'TEAM_SELECTION' : 'AUTH');
+    }
   };
 
   const registerUser = async (name: string, handle: string, chatId: string) => {
@@ -334,7 +353,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addTask = async (task: Task) => {
     // GUARD: Only Admin can add tasks
     if (currentUser?.role !== 'ADMIN') {
-        alert('يا ناصح! الناظر بس هو اللي بيحط الواجبات.');
+        alert('يا ناصح! "شد ودان" بس هو اللي بيحط الواجبات.');
         return;
     }
 
@@ -364,8 +383,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           notifyNewTask(appConfig.botToken, assignee.telegramChatId, finalTask, assignee, true);
         }
     }
-
-    // Apply Penalty Immediately if created with past date
+    
+    // Apply Penalty Immediately if created with past date (outside of bot token check to be safe)
     if (isLate) {
        const penalty = POINTS_SYSTEM.PENALTY[finalTask.severity];
        if (finalTask.assigneeId) {
@@ -449,7 +468,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteTask = async (taskId: string) => {
     // GUARD: Only Admin can delete tasks
     if (currentUser?.role !== 'ADMIN') {
-        alert('عايز تزور في الدفاتر؟ الناظر بس اللي بيمسح.');
+        alert('عايز تزور في الدفاتر؟ "شد ودان" بس اللي بيمسح.');
         return;
     }
     if (!appConfig?.channelId) return;
@@ -525,19 +544,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   if (hostedUrl) {
                       avatar = hostedUrl;
                   } else {
-                      console.warn("ImgBB Upload returned null, using direct link");
                       avatar = telegramUrl; 
                   }
                 } else {
-                   console.warn("Proxy fetch failed for avatar, using direct link");
                    avatar = telegramUrl; 
                 }
             } catch (e) {
-                console.warn("Failed to upload Telegram image to host, using direct link", e);
                 avatar = telegramUrl;
             }
-        } else {
-            console.log("No Telegram avatar found for", chatId);
         }
       } catch (e) {
         console.error("Error fetching telegram avatar", e);
@@ -625,7 +639,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <AppContext.Provider value={{
       appView, currentUser, userTeams, appConfig, team, tasks,
-      completeOnboarding, registerUser, createTeam, joinTeamById, selectTeam, exitTeam, signOut,
+      completeOnboarding, registerUser, createTeam, joinTeamById, selectTeam, exitTeam, signOut, openAbout, goBack,
       addTask, updateTaskStatus, assignForfeits, selectForfeit, submitProof, deleteTask, addMember, updateUserProfile
     }}>
       {children}

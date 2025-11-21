@@ -32,7 +32,7 @@ export const POINTS_SYSTEM = {
   REDEMPTION: 15 // Points gained back after doing the forfeit
 };
 
-export type AppView = 'ONBOARDING' | 'AUTH' | 'TEAM_SELECTION' | 'SETUP' | 'MAIN_APP';
+export type AppView = 'ONBOARDING' | 'AUTH' | 'TEAM_SELECTION' | 'SETUP' | 'MAIN_APP' | 'ABOUT';
 
 export interface AppConfig {
   botToken: string;

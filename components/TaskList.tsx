@@ -226,7 +226,7 @@ export const TaskList: React.FC = () => {
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation(); // Prevent bubble up issues
-                                        if(confirm('متأكد إنك عايز تمسحها؟ الناظر مبينساش.')) {
+                                        if(confirm('متأكد إنك عايز تمسحها؟ "شد ودان" مبينساش.')) {
                                             deleteTask(task.id);
                                             closeMenu();
                                         }

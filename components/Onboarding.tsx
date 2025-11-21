@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, AlertTriangle, Gavel, Smile } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -11,21 +12,21 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const slides = [
     {
       id: 1,
-      icon: <AlertTriangle size={80} className="text-red-500 animate-bounce" />,
+      image: "https://iili.io/f3oxHQI.jpg",
       title: "زهقت من المواعيد المضروبة؟",
       desc: "التيم عندك كل ما تسألهم على التاسك يقولولك 'بكرة إن شاء الله' وبكرة مبيجيش؟ الديدلاين بقى مجرد اقتراح مش إلتزام؟",
       sub: "إحنا حاسين بيك.."
     },
     {
       id: 2,
-      icon: <Gavel size={80} className="text-nazir-dark animate-pulse" />,
-      title: "الحل: نظام الناظر الصارم",
-      desc: "مفيش هزار هنا. نظام إدارة مهام مربوط بذكاء اصطناعي (الناظر) بيراقب كل كبيرة وصغيرة. لو التاسك اتأخرت، الناظر مش هيبعت إيميل.. الناظر هيحفل عليك.",
+      image: "https://iili.io/f3ounSe.jpg",
+      title: "الحل: نظام \"شد ودان\" الصارم",
+      desc: "مفيش هزار هنا. نظام إدارة مهام مربوط بذكاء اصطناعي (شد ودان) بيراقب كل كبيرة وصغيرة. لو التاسك اتأخرت، السيستم مش هيبعت إيميل.. السيستم هيحفل عليك.",
       sub: "الذكاء الاصطناعي بقى توكسيك."
     },
     {
       id: 3,
-      icon: <Smile size={80} className="text-teal-500 animate-spin-slow" />,
+      image: "https://iili.io/f3nkzIj.jpg",
       title: "الفضيحة بدل الخصم",
       desc: "بدل ما نخصم فلوس، إحنا هنخلي المتخاذل يدفع من كرامته. أحكام محرجة، بوستات اعتذار، وتغيير صور بروفايل.",
       sub: "مستعد للعبة؟"
@@ -46,11 +47,15 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-100/50 rounded-full blur-3xl" />
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-amber-100/50 rounded-full blur-3xl" />
 
-      <div className="max-w-md w-full bg-white/80 backdrop-blur-lg border border-slate-200 p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center min-h-[550px]">
+      <div className="max-w-md w-full bg-white/80 backdrop-blur-lg border border-slate-200 p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center min-h-[600px]">
         
-        <div className="flex-1 flex flex-col items-center justify-center gap-6">
-          <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm">
-            {slides[step].icon}
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full">
+          <div className="transition-all duration-500 flex items-center justify-center w-full h-64 bg-transparent">
+             <img 
+                src={slides[step].image} 
+                alt={slides[step].title} 
+                className="max-w-full max-h-full object-contain rounded-[20px] shadow-sm" 
+             />
           </div>
           
           <div className="space-y-3 animate-fade-in">

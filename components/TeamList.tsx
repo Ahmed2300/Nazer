@@ -30,7 +30,7 @@ export const TeamList: React.FC = () => {
       <div className="bg-white rounded-2xl p-10 border border-nazir-800 text-center relative overflow-hidden shadow-sm">
         <div className="relative z-10">
           <h2 className="text-3xl font-black text-nazir-dark mb-3">الكتيبة: {team.name}</h2>
-          <p className="text-slate-500 text-lg font-medium">الناظر بيراقب {team.members.length} من العملاء في القسم.</p>
+          <p className="text-slate-500 text-lg font-medium">"شد ودان" بيراقب {team.members.length} من العملاء في القسم.</p>
           <div className="flex justify-center gap-4 mt-8">
             <button className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-6 py-3 rounded-full text-sm font-bold transition-colors shadow-lg shadow-sky-500/20 transform hover:-translate-y-0.5">
                 <MessageSquare size={20} /> جروب الواتس/تيليجرام

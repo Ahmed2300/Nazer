@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { 
@@ -6,21 +7,22 @@ import {
   Gavel, 
   Users, 
   LogOut,
-  ArrowLeft
+  ArrowLeft,
+  Info
 } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  onExitTeam?: () => void; // New prop
+  onExitTeam?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onExitTeam }) => {
-  const { currentUser, team, signOut } = useApp();
+  const { currentUser, team, signOut, openAbout } = useApp();
   
   const navItems = [
-    { id: 'dashboard', label: 'مكتب الناظر', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'مكتب الإدارة', icon: LayoutDashboard },
     { id: 'tasks', label: 'كراسة الواجب', icon: ListTodo },
     { id: 'judgement', label: 'المجلس التأديبي', icon: Gavel, alert: true },
     { id: 'team', label: 'أعضاء هيئة التدريس', icon: Users },
@@ -33,13 +35,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <div className="h-24 flex items-center justify-center lg:justify-start lg:px-6 border-b border-nazir-800">
           <div className="relative group">
             <img 
-              src={team.image || "https://iili.io/fdrDZrB.png"} 
+              src={team.image || "https://iili.io/f3oqJuS.png"} 
               alt="Team Logo" 
               className="w-12 h-12 rounded-xl shadow-md ml-3 object-cover border border-slate-100" 
             />
           </div>
           <div className="hidden lg:flex flex-col">
-             <span className="font-black text-xl tracking-wide text-nazir-dark">الناظر</span>
+             <span className="font-black text-xl tracking-wide text-nazir-dark">شد ودان</span>
              <span className="text-xs text-slate-500 font-medium truncate max-w-[140px]">{team.name}</span>
           </div>
         </div>
@@ -68,6 +70,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </nav>
 
         <div className="p-4 border-t border-nazir-800 space-y-2">
+          <button 
+             onClick={openAbout}
+             className="flex items-center justify-center lg:justify-start w-full p-3 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-nazir-500 transition-colors gap-3"
+          >
+             <Info size={20} />
+             <span className="hidden lg:block text-sm font-bold">شرح النظام</span>
+          </button>
           <button 
              onClick={onExitTeam}
              className="flex items-center justify-center lg:justify-start w-full p-3 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-nazir-dark transition-colors gap-3"

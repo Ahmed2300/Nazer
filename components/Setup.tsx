@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Bot, Hash, Key, CheckCircle, ArrowLeft, Type, Image as ImageIcon, Upload } from 'lucide-react';
+import { Hash, Key, CheckCircle, ArrowLeft, Type, Image as ImageIcon, Upload } from 'lucide-react';
 import { uploadToImgBB } from '../services/imageService';
 
 interface SetupProps {
@@ -52,9 +52,11 @@ export const Setup: React.FC<SetupProps> = ({ onSaveConfig, onCancel }) => {
         )}
 
         <div className="text-center mb-8 mt-4">
-          <div className="w-16 h-16 bg-teal-50 rounded-full mx-auto flex items-center justify-center text-teal-600 mb-4">
-            <Bot size={32} />
-          </div>
+          <img 
+            src="https://iili.io/f3oqJuS.png" 
+            alt="Shad Wdan Logo" 
+            className="w-20 h-20 mx-auto mb-4 drop-shadow-md" 
+          />
           <h2 className="text-2xl font-bold text-slate-800 mb-2">تأسيس كتيبة جديدة</h2>
           <p className="text-slate-500 text-sm">دخل بيانات البوت والجروب عشان نأسس غرفة عمليات (Dashboard) جديدة.</p>
         </div>
